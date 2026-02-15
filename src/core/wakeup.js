@@ -1,5 +1,5 @@
 // @flow
-import { getSnoozedTabs, saveSnoozedTabs } from './storage';
+import { getSnoozedTabs, saveSnoozedTabs, addToUndoStack } from './storage';
 
 import {
   createTabs,
@@ -112,6 +112,13 @@ export async function wakeupTabs(
       throw new Error(`Cannot wake up tab "${tab.title}" - URL is empty or missing`);
     }
   });
+
+  // Save to undo stack before deleting (skip periodic tabs since they auto-resnooze)
+  for (let tab of tabsToWakeUp) {
+    if (!tab.period) {
+      await addToUndoStack(tab);
+    }
+  }
 
   // delete waking tabs from storage
   await deleteSnoozedTabs(tabsToWakeUp);

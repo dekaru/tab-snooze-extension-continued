@@ -3,6 +3,7 @@
 import React, { Fragment } from 'react';
 import { HashRouter, Route } from 'react-router-dom';
 import SnoozePanel from './components/SnoozePanel';
+import UndoSnackbar from './components/UndoSnackbar/UndoSnackbar';
 import {
   POPUP_PATH,
   OPTIONS_PATH,
@@ -50,6 +51,7 @@ const Router = () => (
       <Route path={RATE_TS_PATH} component={AsyncRateTSDialog} />
       <Route path={BETA_PATH} component={AsyncBetaDialog} />
       <Route path={TUTORIAL_PATH} component={AsyncTutorial} />
+      <UndoSnackbar />
     </Fragment>
   </HashRouter>
 );

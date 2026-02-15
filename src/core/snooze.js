@@ -1,5 +1,5 @@
 // @flow
-import { getSnoozedTabs, saveSnoozedTabs } from './storage';
+import { getSnoozedTabs, saveSnoozedTabs, popFromUndoStack } from './storage';
 import {
   getActiveTab,
   calcNextOccurrenceForPeriod,
@@ -147,4 +147,42 @@ export async function resnoozePeriodicTab(snoozedTab: SnoozedTab) {
 
   // Schedule next wakeup
   await scheduleWakeupAlarm('auto');
+}
+
+/**
+ * Undo the last wake-up action by re-snoozing the tab
+ */
+export async function undoLastWakeup(): Promise<SnoozedTab | null> {
+  const undoItem = await popFromUndoStack();
+
+  if (!undoItem) {
+    console.log('No items in undo stack');
+    return null;
+  }
+
+  console.log('Undoing wake-up for:', undoItem.title);
+
+  // Remove timestamp added by undo stack
+  const { awokenAt, ...snoozedTab } = undoItem;
+
+  // Re-add to snoozed tabs
+  const snoozedTabs = await getSnoozedTabs();
+  snoozedTabs.push(snoozedTab);
+  await saveSnoozedTabs(snoozedTabs);
+
+  // Schedule next wakeup
+  await scheduleWakeupAlarm('auto');
+
+  // Try to close the awakened tab if it's still open
+  try {
+    const tabs = await chrome.tabs.query({ url: snoozedTab.url });
+    if (tabs.length > 0) {
+      await chrome.tabs.remove(tabs[0].id);
+      console.log('Closed awakened tab');
+    }
+  } catch (error) {
+    console.log('Could not close awakened tab:', error);
+  }
+
+  return snoozedTab;
 }
