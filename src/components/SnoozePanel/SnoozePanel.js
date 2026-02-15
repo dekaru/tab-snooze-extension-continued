@@ -105,6 +105,12 @@ class SnoozePanel extends Component<Props, State> {
   }
 
   onKeyPress(event: Event) {
+    // Ignore keyboard shortcuts when typing in input fields
+    const target = event.target;
+    if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA')) {
+      return;
+    }
+
     const {
       focusedButtonIndex,
       snoozeOptions,
