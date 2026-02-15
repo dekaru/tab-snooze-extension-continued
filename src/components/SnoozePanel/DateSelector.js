@@ -14,12 +14,16 @@ type Props = { visible: boolean, onDateSelected: Date => void };
 type State = {
   selectedDate: any,
   selectedHour: number,
+  dateInputValue: string,
+  dateInputError: boolean,
 };
 
 export default class DateSelector extends Component<Props, State> {
   state = {
     selectedDate: new Date(),
     selectedHour: 9,
+    dateInputValue: '',
+    dateInputError: false,
   };
 
   datePicker: any;
@@ -31,6 +35,39 @@ export default class DateSelector extends Component<Props, State> {
     getSettings().then(settings =>
       this.setState({ selectedHour: settings.workdayStart })
     );
+  }
+
+  onDateInputChange(value: string) {
+    this.setState({ dateInputValue: value });
+
+    // Try to parse the input as a date
+    const parsed = moment(value, [
+      'YYYY-MM-DD',
+      'MM/DD/YYYY',
+      'DD/MM/YYYY',
+      'MMMM D, YYYY',
+      'MMM D, YYYY',
+      'D MMM YYYY',
+      'YYYY-MM-DD HH:mm',
+    ], true);
+
+    if (parsed.isValid() && parsed.isAfter(moment().startOf('day'))) {
+      // Valid future date
+      this.setState({
+        selectedDate: parsed.toDate(),
+        dateInputError: false,
+      });
+      // Update calendar to show this month
+      if (this.datePicker.current) {
+        this.datePicker.current.showMonth(parsed.toDate());
+      }
+    } else if (value.trim() !== '') {
+      // Invalid date (but not empty)
+      this.setState({ dateInputError: true });
+    } else {
+      // Empty input
+      this.setState({ dateInputError: false });
+    }
   }
 
   onSnoozeClicked() {
@@ -47,11 +84,21 @@ export default class DateSelector extends Component<Props, State> {
 
   render() {
     const { visible } = this.props;
-    const { selectedDate, selectedHour } = this.state;
+    const { selectedDate, selectedHour, dateInputValue, dateInputError } = this.state;
 
     return (
       <SnoozeModal visible={visible}>
         <Root>
+          <DateInputContainer>
+            <DateInput
+              type="text"
+              placeholder="Or type a date (e.g., 2026-03-15, tomorrow)"
+              value={dateInputValue}
+              onChange={e => this.onDateInputChange(e.target.value)}
+              hasError={dateInputError}
+            />
+            {dateInputError && <ErrorText>Invalid date format</ErrorText>}
+          </DateInputContainer>
           <MyDayPicker
             selectedDays={selectedDate}
             onDayClick={date => this.setState({ selectedDate: date })}
@@ -160,4 +207,32 @@ const MonthName = styled(NavButton)`
   font-weight: 400;
   font-size: 20px;
   flex: 1;
+`;
+
+const DateInputContainer = styled.div`
+  margin-bottom: 12px;
+`;
+
+const DateInput = styled.input`
+  width: 100%;
+  padding: 10px;
+  font-size: 14px;
+  border: 2px solid ${props => props.hasError ? '#ff4444' : '#ddd'};
+  border-radius: 5px;
+  box-sizing: border-box;
+  outline: none;
+
+  &:focus {
+    border-color: ${props => props.hasError ? '#ff4444' : '#4CAF50'};
+  }
+
+  &::placeholder {
+    color: #999;
+  }
+`;
+
+const ErrorText = styled.div`
+  color: #ff4444;
+  font-size: 12px;
+  margin-top: 4px;
 `;

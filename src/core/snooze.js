@@ -35,6 +35,19 @@ export async function snoozeTab(
     'Snoozing tab until ' + new Date(wakeupTime).toString()
   );
 
+  // Log the tab info for debugging
+  console.log('Tab to snooze:', {
+    url: tab.url,
+    title: tab.title,
+    id: tab.id,
+  });
+
+  // Validate the URL before saving
+  if (!tab.url || tab.url.trim() === '') {
+    console.error('ERROR: Tab URL is empty!', tab);
+    throw new Error('Cannot snooze a tab with an empty URL');
+  }
+
   // The info to store about this tab
   const snoozedTab: SnoozedTab = {
     url: tab.url,

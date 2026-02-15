@@ -53,7 +53,7 @@ export default class SnoozeFooter extends Component<Props, State> {
         <Buttons>
           <SleepingTabsBtn as={Link} to={SLEEPING_TABS_PATH}>
             <SleepinCountBadge>{sleepingTabsCount}</SleepinCountBadge>
-            Sleeping Tabs
+            Sleeping Tabs 😴
           </SleepingTabsBtn>
           {!betaBadge && upgradeBadge && (
             <BadgeButton

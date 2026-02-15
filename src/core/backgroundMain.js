@@ -30,6 +30,18 @@ import {
 } from './badge';
 import { saveSettings } from './settings';
 
+// Debounce helper to prevent multiple rapid invocations
+function debounce(func, wait) {
+  let timeout;
+  return function executedFunction(...args) {
+    const later = () => {
+      clearTimeout(timeout);
+      func(...args);
+    };
+    clearTimeout(timeout);
+    timeout = setTimeout(later, wait);
+  };
+}
 
 /**
  * runBackgroundScript() is called by index.js on the main thread of a Chrome Extension
@@ -86,18 +98,23 @@ export function runBackgroundScript() {
     }
   });
 
+  // Debounced command handlers to prevent multiple rapid invocations
+  const debouncedCreateTodo = debounce(() => createTab(TODO_PATH), 500);
+  const debouncedRepeatSnooze = debounce(() => repeatLastSnooze(), 500);
+  const debouncedOpenSleepingTabs = debounce(() => createTab(SLEEPING_TABS_PATH), 500);
+
   chrome.commands.onCommand.addListener(command => {
     // create a new todo window!, and focus on it
     if (command === COMMAND_NEW_TODO) {
-      createTab(TODO_PATH);
+      debouncedCreateTodo();
     }
 
     if (command === COMMAND_REPEAT_LAST_SNOOZE) {
-      repeatLastSnooze();
+      debouncedRepeatSnooze();
     }
 
     if (command === COMMAND_OPEN_SLEEPING_TABS) {
-      createTab(SLEEPING_TABS_PATH);
+      debouncedOpenSleepingTabs();
     }
   });
 }

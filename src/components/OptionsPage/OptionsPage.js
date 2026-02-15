@@ -48,7 +48,7 @@ function OptionsPage(props) {
             <Logo src={require('./images/navbar_logo.svg')} />
           </a>
           <NavButton component={NavLink} to={SLEEPING_TABS_PATH}>
-            <SleepingIcon className={classes.navIcon} /> Sleeping Tabs
+            <SleepingIcon className={classes.navIcon} /> Sleeping Tabs 😴
           </NavButton>
           <NavButton component={NavLink} to={SETTINGS_PATH}>
             <SettingsIcon className={classes.navIcon} /> Settings

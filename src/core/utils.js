@@ -158,7 +158,31 @@ export async function getActiveTab() {
     active: true,
     currentWindow: true,
   });
-  return tabs[0];
+
+  const activeTab = tabs[0];
+
+  if (!activeTab) {
+    console.error('ERROR: No active tab found');
+    throw new Error('No active tab found');
+  }
+
+  // Additional check for tab URL
+  if (!activeTab.url) {
+    console.error('ERROR: Active tab has no URL', activeTab);
+    // Try to get the tab again with its ID to see if we can get the full info
+    try {
+      const refreshedTab = await chrome.tabs.get(activeTab.id);
+      if (refreshedTab && refreshedTab.url) {
+        console.log('Successfully retrieved URL after refresh:', refreshedTab.url);
+        return refreshedTab;
+      }
+    } catch (e) {
+      console.error('Failed to refresh tab info:', e);
+    }
+    throw new Error('Active tab has no URL');
+  }
+
+  return activeTab;
 }
 
 /*

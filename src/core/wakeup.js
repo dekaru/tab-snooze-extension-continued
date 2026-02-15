@@ -19,17 +19,52 @@ import { ensureOffscreenDocument } from "./backgroundMain";
 
 // import bugsnag from '../bugsnag';
 
+// Leading edge debounce: Execute immediately, ignore duplicates for X seconds
+function debounce(func, wait) {
+  let timeout;
+  let canExecute = true;
+
+  return async function executedFunction(...args) {
+    // If we can't execute (still in cooldown), skip
+    if (!canExecute) {
+      console.log('Debounce: Ignoring duplicate alarm during cooldown period');
+      return;
+    }
+
+    // Execute immediately
+    canExecute = false;
+    await func(...args);
+
+    // Reset cooldown after wait period
+    clearTimeout(timeout);
+    timeout = setTimeout(() => {
+      canExecute = true;
+    }, wait);
+  };
+}
 
 const WAKEUP_TABS_ALARM_NAME = 'WAKEUP_TABS_ALARM';
+const STORAGE_KEY_WAKEUP_THRESHOLD = 'wakeupThreshold';
 
 /*
     This timestamp prevents several alarms from going off at the same
-    time and cause tabs to be woken up more than once because of a 
+    time and cause tabs to be woken up more than once because of a
     asynchrouneous nature of storage.get/set.
     when alarm goes off, it sets this timestamp to a minute from now, to
     mark that it handles waking up tabs in the next minute.
+
+    Stored in chrome.storage.session to persist across service worker restarts
+    (Manifest V3) while still clearing when the browser closes.
 */
-let wakeupThreshold = new Date(0);
+async function getWakeupThreshold(): Promise<Date> {
+  const result = await chrome.storage.session.get(STORAGE_KEY_WAKEUP_THRESHOLD);
+  const wakeupThreshold = result[STORAGE_KEY_WAKEUP_THRESHOLD];
+  return wakeupThreshold ? new Date(wakeupThreshold) : new Date(0);
+}
+
+async function setWakeupThreshold(date: Date): Promise<void> {
+  await chrome.storage.session.set({ [STORAGE_KEY_WAKEUP_THRESHOLD]: date.getTime() });
+}
 
 /*
     Delete tabs from storage
@@ -64,6 +99,20 @@ export async function wakeupTabs(
 ): Promise<Array<ChromeTab>> {
   console.log(`Waking up ${tabsToWakeUp.length} tabs`);
 
+  // Validate tabs before waking them up
+  tabsToWakeUp.forEach((tab, index) => {
+    console.log(`Tab ${index + 1} to wake up:`, {
+      title: tab.title,
+      url: tab.url,
+      urlLength: tab.url ? tab.url.length : 0,
+    });
+
+    if (!tab.url || tab.url.trim() === '') {
+      console.error('ERROR: Snoozed tab has empty URL!', tab);
+      throw new Error(`Cannot wake up tab "${tab.title}" - URL is empty or missing`);
+    }
+  });
+
   // delete waking tabs from storage
   await deleteSnoozedTabs(tabsToWakeUp);
 
@@ -88,7 +137,8 @@ export async function handleScheduledWakeup(): Promise<void> {
   let now = new Date();
 
   // check if tabs for right now already awoken by other alarm.
-  if (now <= wakeupThreshold) {
+  const currentThreshold = await getWakeupThreshold();
+  if (now <= currentThreshold) {
     return;
   }
 
@@ -113,10 +163,11 @@ export async function handleScheduledWakeup(): Promise<void> {
 
   // set wakeupThreshold to a minute in the future to include
   // nearby snoozed tabs.
-  wakeupThreshold = addMinutes(now, 1);
+  const newThreshold = addMinutes(now, 1);
+  await setWakeupThreshold(newThreshold);
 
   let readySleepingTabs = snoozedTabs.filter(
-    snoozedTab => new Date(snoozedTab.when) <= wakeupThreshold
+    snoozedTab => new Date(snoozedTab.when) <= newThreshold
   );
 
   if (readySleepingTabs.length > 0) {
@@ -183,18 +234,22 @@ export function cancelWakeupAlarm(): Promise<void> {
  */
 export function registerEventListeners(): void {
   // Note: registerEventListeners is only called in background script
-  
+
+  // Debounced wakeup handler to prevent multiple rapid invocations
+  const debouncedWakeupHandler = debounce(async () => {
+    console.log('Alarm fired - waking up ready tabs');
+
+    // wake up ready tabs, if any
+    await handleScheduledWakeup();
+
+    // Schedule wakeup for next tabs
+    await scheduleWakeupAlarm('auto');
+  }, 1000);
+
   // Wake up tabs on scheduled dates
   chrome.alarms.onAlarm.addListener(async function(alarm) {
     if (alarm.name === WAKEUP_TABS_ALARM_NAME) {
-      console.log('Alarm fired - waking up ready tabs');
-
-      // wake up ready tabs, if any
-      
-      await handleScheduledWakeup();
-
-      // Schedule wakeup for next tabs
-      await scheduleWakeupAlarm('auto');
+      await debouncedWakeupHandler();
     }
   });
 

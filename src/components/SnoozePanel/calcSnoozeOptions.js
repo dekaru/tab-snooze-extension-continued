@@ -56,13 +56,15 @@ export default function calcSnoozeOptions(
     ? dayStart(moment()) // if its very late, tomorrow = today.
     : dayStart(moment().add(1, 'days'));
   const weekendTime = isWeekend
-    ? dayStart(moment().day(7 + weekEndDay)) // choose next weekend
+    ? moment().day() === (weekEndDay + 1) % 7 // if it's Sunday (day after Saturday)
+      ? dayStart(moment().day(weekEndDay)) // go to this week's Saturday
+      : dayStart(moment().day(7 + weekEndDay)) // if it's Saturday, go to next Saturday
     : dayStart(moment().day(weekEndDay));
   const nextWeekTime = dayStart(moment().day(weekStartDay + 7)); // next day which start the week
   const inAMonthTime = dayStart(moment().add(1, 'months'));
-  const somedayTime = dayStart(
-    moment().add(somedayMonthsDelta, 'months')
-  );
+  // Random date between now and next year (1-365 days)
+  const randomDays = Math.floor(Math.random() * 365) + 1;
+  const somedayTime = dayStart(moment().add(randomDays, 'days'));
 
   return [
     {
@@ -118,9 +120,7 @@ export default function calcSnoozeOptions(
       title: 'Someday',
       icon: require('./icons/pine.svg'),
       activeIcon: require('./icons/pine_white.svg'),
-      tooltip: `${somedayTime.format(
-        'LL'
-      )} (${somedayMonthsDelta} months from now)`,
+      tooltip: `${somedayTime.format('LL')} (random date within next year)`,
       when: somedayTime.toDate(),
     },
     {
